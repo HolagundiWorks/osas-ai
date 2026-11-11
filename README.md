@@ -13,7 +13,7 @@ configs/          model registry, training, data, tools, evaluation
 src/myna_ai/      package
 scripts/          inspect, prepare, train, evaluate, export, download
 tests/            unit tests and a CPU vertical slice
-docker/           CUDA image definition (not built in the initial environment)
+docker/           CUDA image, built locally as myna-ai:local
 docs/             architecture, data, training, evaluation, deployment, security
 ```
 
