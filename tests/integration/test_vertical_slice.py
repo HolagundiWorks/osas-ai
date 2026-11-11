@@ -146,3 +146,4 @@ def test_transformers_registers_olmo3_and_trl_config_builds() -> None:
     assert sft_config.max_steps == 1
     assert sft_config.bf16 is False
     assert sft_config.max_length == 128
+    assert sft_config.completion_only_loss is True

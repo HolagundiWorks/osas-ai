@@ -109,6 +109,8 @@ A model is not promoted when a critical quantity, revision, geometry or engineer
 
 Application code should validate tool calls and authorise anything that changes a project. Numerical quantities, code checks and approval transitions belong to deterministic Myna services. The tool catalog is an example schema (`verified: false`), not a confirmed MynaCAD or CoreOps API.
 
+A directory written by `--merge` loads offline in `LocalTransformersRuntime`. A missing weight or tokenizer file raises an error. That load does not download OLMo. `backend: trl` can run the smoke model with a local character tokenizer. It still refuses OLMo 7B on CPU. The native loop remains the path that masks every assistant span.
+
 ## Licence
 
 Package code is Apache 2.0. OLMo 3 weights are Apache 2.0 under Ai2's responsible-use guidance. CAD Environments is CC BY-NC 4.0 and is not cleared here for commercial training.

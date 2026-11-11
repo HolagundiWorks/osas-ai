@@ -34,6 +34,8 @@ For a real run, point `--checkpoint` at the 7B adapter directory and `--model-ke
 
 `--merge` runs PEFT `merge_and_unload` and writes a full-precision directory plus a checksum manifest. The smoke checkpoint can be merged on CPU because its base weights are already in `model.safetensors`. An OLMo merge requires `model_path` in `training_config.json` to be a local directory that already contains `config.json`. The exporter does not download weights. QLoRA checkpoints are refused. `promotion_allowed` stays false, and `olmo_7b_trained` stays false.
 
+`LocalTransformersRuntime` loads that merged directory offline. It reads `config.json`, `model.safetensors`, and either `char_tokenizer.json` or a tokenizer saved in the same directory. `HF_HUB_OFFLINE` is set for the load. A missing file raises `InferenceError` instead of downloading weights. Generation turns `use_cache` on when the saved config left it false.
+
 ```bash
 python scripts/export.py --checkpoint outputs/smoke-tiny/checkpoint-12 --output outputs/merged --model-key smoke-tiny --merge
 python scripts/export.py --checkpoint outputs/smoke-tiny/checkpoint-12 --output outputs/weights --model-key smoke-tiny --full-precision

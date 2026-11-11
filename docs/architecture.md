@@ -48,9 +48,9 @@ CAD Environments workflows become semantic notes. Mouse and keyboard events stay
 
 ## Training
 
-The native loop is the tested path. It renders the OLMo 3 chat template, masks every token outside assistant spans, and saves a full smoke state dict plus a PEFT adapter directory. QLoRA uses bitsandbytes NF4 only after the CUDA check passes. There is no CPU fallback for the 7B model.
+The native loop is the tested path for span-level loss masking. It renders the OLMo 3 chat template, masks every token outside assistant spans, and saves a full smoke state dict plus a PEFT adapter directory. QLoRA uses bitsandbytes NF4 only after the CUDA check passes. There is no CPU fallback for the 7B model.
 
-TRL can be selected with `backend: trl` for a Hugging Face model id. The smoke model stays on the native loop because TRL expects a pretrained checkpoint.
+TRL can be selected with `backend: trl`. A smoke run uses the local character tokenizer and does not download weights. TRL masks the prompt before the first assistant span. The native loop is still the path that masks every assistant span when later user turns are present.
 
 ## Inference boundary
 

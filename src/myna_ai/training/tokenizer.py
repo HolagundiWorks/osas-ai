@@ -63,3 +63,43 @@ class CharTokenizer:
         if payload.get("type") != "myna-char-tokenizer":
             raise ValueError(f"Not a Myna character tokenizer: {path}")
         return cls()
+
+    def to_hf_tokenizer(self) -> Any:
+        """Return a local Hugging Face tokenizer with the same character ids.
+
+        TRL requires ``PreTrainedTokenizer``. This wrapper does not download a
+        vocabulary. It is not a fast tokenizer and does not emit offset maps.
+        """
+        from transformers import PreTrainedTokenizer
+
+        itos = list(self._itos)
+        stoi = dict(self._stoi)
+        pad_token = self.pad_token
+        eos_token = self.eos_token
+        unk_token = self.unk_token
+
+        class HuggingFaceCharTokenizer(PreTrainedTokenizer):
+            model_input_names = ["input_ids", "attention_mask"]
+
+            def __init__(self) -> None:
+                super().__init__(pad_token=pad_token, eos_token=eos_token, unk_token=unk_token)
+
+            @property
+            def vocab_size(self) -> int:
+                return len(itos)
+
+            def get_vocab(self) -> dict[str, int]:
+                return dict(stoi)
+
+            def _tokenize(self, text: str) -> list[str]:
+                return list(text)
+
+            def _convert_token_to_id(self, token: str) -> int:
+                return stoi.get(token, 2)
+
+            def _convert_id_to_token(self, index: int) -> str:
+                if 0 <= index < len(itos):
+                    return itos[index]
+                return unk_token
+
+        return HuggingFaceCharTokenizer()

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from myna_ai.common.errors import ExportError, GpuRequiredError
+from myna_ai.common.errors import ExportError, GpuRequiredError, InferenceError
 from myna_ai.common.io import read_json, write_json
 from myna_ai.compression.recovery import launch_recovery_finetune, plan_recovery_finetune
 from myna_ai.evaluation.matrix import build_comparison_matrix, write_matrix
@@ -11,6 +11,7 @@ from myna_ai.export.full_precision import export_full_precision
 from myna_ai.export.gguf import convert_to_gguf
 from myna_ai.export.manifest import verify_manifest
 from myna_ai.export.merge import merge_adapter_checkpoint
+from myna_ai.inference.local_runtime import LocalTransformersRuntime
 from myna_ai.models.registry import require_model
 
 
@@ -141,6 +142,36 @@ def test_recovery_plan_does_not_launch_and_olmo_execute_refuses_cpu(tmp_path: Pa
             execute=True,
             max_steps=2,
         )
+
+
+def test_merged_directory_without_weights_is_not_downloaded(tmp_path: Path) -> None:
+    export = tmp_path / "merged"
+    export.mkdir()
+    write_json(
+        export / "export_metadata.json",
+        {"artifact_type": "merged_full_precision", "model_key": "smoke-tiny", "smoke_test": True},
+    )
+    runtime = LocalTransformersRuntime(export)
+    with pytest.raises(InferenceError, match="not downloaded"):
+        runtime.load()
+
+
+def test_trl_olmo_refuses_cpu(tmp_path: Path) -> None:
+    from myna_ai.training.config import TrainingConfig
+    from myna_ai.training.loop import run_training
+
+    config = TrainingConfig(
+        model_key="olmo3-7b-instruct",
+        train_path=tmp_path / "train.jsonl",
+        output_dir=tmp_path / "out",
+        method="lora",
+        precision="bf16",
+        allow_cpu_smoke=False,
+        backend="trl",
+        max_steps=1,
+    )
+    with pytest.raises(GpuRequiredError):
+        run_training(config)
 
 
 def test_qlora_merge_is_refused(tmp_path: Path) -> None:
