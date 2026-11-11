@@ -40,15 +40,11 @@ def prune_mlp_module(module: Any, *, percentage: float, calibration: Any, alignm
             f"Pruning {percentage:.0%} of {intermediate} units would leave fewer than {alignment} units."
         )
     index = torch.topk(importance, keep).indices.sort().values
-    pruned = nn.Module()
-    pruned.gate_proj = _sliced_linear(module.gate_proj, index, row=True)
-    pruned.up_proj = _sliced_linear(module.up_proj, index, row=True)
-    pruned.down_proj = _sliced_linear(module.down_proj, index, row=False)
-
-    def forward(hidden):  # noqa: ANN001
-        return pruned.down_proj(F.silu(pruned.gate_proj(hidden)) * pruned.up_proj(hidden))
-
-    pruned.forward = forward  # type: ignore[method-assign]
+    pruned = _new_pruned_mlp(
+        _sliced_linear(module.gate_proj, index, row=True),
+        _sliced_linear(module.up_proj, index, row=True),
+        _sliced_linear(module.down_proj, index, row=False),
+    )
     report = {
         "requested_percentage": percentage,
         "intermediate_before": intermediate,
@@ -64,6 +60,23 @@ def prune_mlp_module(module: Any, *, percentage: float, calibration: Any, alignm
         "promotion_reason": "A pruned module is not promoted without a full evaluation against the unpruned model.",
     }
     return pruned, report
+
+
+def _new_pruned_mlp(gate_proj: Any, up_proj: Any, down_proj: Any) -> Any:
+    import torch.nn.functional as F
+    from torch import nn
+
+    class PrunedOlmoMLP(nn.Module):
+        def __init__(self, gate: Any, up: Any, down: Any) -> None:
+            super().__init__()
+            self.gate_proj = gate
+            self.up_proj = up
+            self.down_proj = down
+
+        def forward(self, hidden: Any) -> Any:
+            return self.down_proj(F.silu(self.gate_proj(hidden)) * self.up_proj(hidden))
+
+    return PrunedOlmoMLP(gate_proj, up_proj, down_proj)
 
 
 def _require_olmo_mlp(module: Any) -> None:

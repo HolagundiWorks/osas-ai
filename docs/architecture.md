@@ -58,4 +58,4 @@ TRL can be selected with `backend: trl` for a Hugging Face model id. The smoke m
 
 ## Compression
 
-Structured MLP pruning builds a new module and leaves the original weights in place. The OLMo 3 assessment records that every layer shares one `intermediate_size`, attention is not pruned, and a pruned shape is not a tested GGUF export. Dynamic int8 is a separate experiment from QLoRA and from GGUF.
+Structured MLP pruning builds a new module and leaves the original weights in place. `recover_pruned_mlp` then trains a copy of that module against the original outputs. A recovery plan for the language-model trainer does not launch a job unless `execute` is true, and OLMo 7B still refuses CPU. The OLMo 3 assessment records that every layer shares one `intermediate_size`, attention is not pruned, and a pruned shape is not a tested GGUF export. Dynamic int8 is a separate experiment from QLoRA and from GGUF.

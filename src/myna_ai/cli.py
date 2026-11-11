@@ -65,8 +65,25 @@ def train() -> None:
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--max-steps", type=int)
     parser.add_argument("--resume-from-checkpoint", type=Path)
+    parser.add_argument("--recovery", action="store_true", help="Plan or launch a recovery fine-tune from a pruned checkpoint.")
+    parser.add_argument("--pruned-checkpoint", type=Path)
+    parser.add_argument("--execute-recovery", action="store_true", help="Start the recovery job. Without this flag only a plan is written.")
     args = parser.parse_args()
     configure_logging()
+    if args.recovery:
+        if args.pruned_checkpoint is None:
+            parser.error("--pruned-checkpoint is required with --recovery.")
+        from myna_ai.compression.recovery import launch_recovery_finetune
+
+        plan = launch_recovery_finetune(
+            pruned_checkpoint=args.pruned_checkpoint,
+            train_config=args.config,
+            output_dir=args.output_dir,
+            execute=args.execute_recovery,
+            max_steps=args.max_steps,
+        )
+        print(json.dumps(plan, indent=2, default=str))
+        return
     from myna_ai.training.config import load_training_config
     from myna_ai.training.loop import run_training
 
@@ -89,47 +106,96 @@ def train() -> None:
 
 def evaluate() -> None:
     parser = argparse.ArgumentParser(description="Score the held-out suite. Use --reference for the scripted gold behaviour.")
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--output", type=Path)
     parser.add_argument("--reference", action="store_true")
     parser.add_argument("--label", default="reference")
+    parser.add_argument("--matrix-output", type=Path, help="Write the A/B/C/D comparison. Unsupplied slots stay unmeasured.")
+    parser.add_argument("--slot", choices=["A", "B", "C", "D"], help="Place the --reference report in this matrix slot.")
+    parser.add_argument("--report", action="append", default=[], help="Existing report as SLOT=directory, for example B=outputs/eval.")
     args = parser.parse_args()
     configure_logging()
+    from myna_ai.evaluation.matrix import build_comparison_matrix, load_report_slot, write_matrix
     from myna_ai.evaluation.runner import evaluate_generator, reference_generator, write_report
 
-    if not args.reference:
-        parser.error("Pass --reference, or call the Python API with a loaded runtime. A 7B model is not downloaded by this command.")
-    report = evaluate_generator(reference_generator(), model_label=args.label)
-    json_path, markdown_path = write_report(report, args.output)
-    print(json.dumps({"json": str(json_path), "markdown": str(markdown_path), "promote": report["promotion"]["promote"]}, indent=2))
+    if not args.reference and not args.matrix_output:
+        parser.error("Pass --reference, or --matrix-output with --report. A 7B model is not downloaded by this command.")
+    if args.reference and args.output is None:
+        parser.error("--output is required with --reference.")
+    reports: dict = {}
+    payload: dict = {}
+    if args.reference:
+        report = evaluate_generator(reference_generator(), model_label=args.label)
+        json_path, markdown_path = write_report(report, args.output)
+        payload = {"json": str(json_path), "markdown": str(markdown_path), "promote": report["promotion"]["promote"]}
+        if args.slot:
+            reports[args.slot] = report
+    for item in args.report:
+        slot, report = load_report_slot(item)
+        reports[slot] = report
+    if args.matrix_output:
+        matrix = build_comparison_matrix(reports)
+        json_path, markdown_path = write_matrix(matrix, args.matrix_output)
+        payload["matrix_json"] = str(json_path)
+        payload["matrix_markdown"] = str(markdown_path)
+        payload["olmo_7b_baseline_measured"] = matrix["olmo_7b_baseline_measured"]
+    print(json.dumps(payload, indent=2))
 
 
 def export() -> None:
-    parser = argparse.ArgumentParser(description="Export an adapter directory and write a checksum manifest.")
+    parser = argparse.ArgumentParser(description="Export an adapter, a merged model, or a full-precision copy.")
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--model-key", required=True)
+    parser.add_argument("--merge", action="store_true", help="Merge the LoRA adapter into a local full-precision model.")
+    parser.add_argument("--full-precision", action="store_true", help="Copy safetensors and sidecars, excluding optimizer state.")
     parser.add_argument("--gguf-check", action="store_true")
+    parser.add_argument("--gguf-convert", action="store_true", help="Run a converter. A written file is not a verified llama.cpp load.")
+    parser.add_argument("--gguf-model-dir", type=Path)
+    parser.add_argument("--gguf-converter", type=Path)
     args = parser.parse_args()
     configure_logging()
-    from myna_ai.export.gguf import assess_gguf
-    from myna_ai.export.manifest import export_adapter_directory
+    if args.merge and args.full_precision:
+        parser.error("Pass only one of --merge and --full-precision.")
+    if args.gguf_convert and args.gguf_model_dir is None:
+        parser.error("--gguf-model-dir is required with --gguf-convert.")
+    from myna_ai.export.gguf import assess_gguf, convert_to_gguf
     from myna_ai.models.registry import require_model
 
     spec = require_model(args.model_key)
-    manifest = export_adapter_directory(
-        args.checkpoint,
-        args.output,
-        {
-            "artifact_type": "lora_adapter",
-            "model_key": spec.key,
-            "base_model": spec.hf_id,
-            "promotion_allowed": False,
-            "notes": "Promotion stays false until the evaluation gate is applied to this artifact.",
-        },
-    )
-    payload: dict = {"manifest_files": len(manifest["files"])}
-    if args.gguf_check:
-        payload["gguf"] = assess_gguf(spec)
+    metadata = {
+        "model_key": spec.key,
+        "base_model": spec.hf_id,
+        "promotion_allowed": False,
+        "notes": "Promotion stays false until the evaluation gate is applied to this artifact.",
+    }
+    if args.merge:
+        from myna_ai.export.merge import merge_adapter_checkpoint
+
+        manifest = merge_adapter_checkpoint(args.checkpoint, args.output, metadata)
+    elif args.full_precision:
+        from myna_ai.export.full_precision import export_full_precision
+
+        manifest = export_full_precision(args.checkpoint, args.output, {**metadata, "artifact_type": "full_precision"})
+    else:
+        from myna_ai.export.manifest import export_adapter_directory
+
+        manifest = export_adapter_directory(
+            args.checkpoint,
+            args.output,
+            {**metadata, "artifact_type": "lora_adapter"},
+        )
+    payload: dict = {"manifest_files": len(manifest["files"]), "artifact_type": manifest.get("artifact_type")}
+    if args.gguf_convert:
+        gguf_output = args.output.parent / f"{args.output.name}.gguf"
+        payload["gguf"] = convert_to_gguf(
+            spec,
+            model_dir=args.gguf_model_dir,
+            output=gguf_output,
+            converter=args.gguf_converter,
+            execute=True,
+        )
+    elif args.gguf_check:
+        payload["gguf"] = assess_gguf(spec, converter=args.gguf_converter)
     print(json.dumps(payload, indent=2))
 
 
