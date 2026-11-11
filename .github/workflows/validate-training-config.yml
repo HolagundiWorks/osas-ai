@@ -1,0 +1,41 @@
+name: validate-training-config
+
+on:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install package
+        run: python -m pip install -e ".[dev]"
+      - name: Reject a CPU launch of the 7B config
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from myna_ai.common.errors import GpuRequiredError
+          from myna_ai.models.registry import require_model
+          from myna_ai.training.config import load_training_config
+          from myna_ai.training.hardware import assert_training_device
+          config = load_training_config(
+              Path("configs/training/olmo3_7b_qlora.yaml"),
+              {
+                  "train_path": Path("data/synthetic-placeholder.jsonl"),
+                  "validation_path": Path("data/synthetic-placeholder.jsonl"),
+                  "output_dir": Path("outputs/unused"),
+              },
+          )
+          spec = require_model(config.model_key)
+          try:
+              assert_training_device(spec, config, status={"available": False, "free_gb": None, "reason": "workflow runner"})
+          except GpuRequiredError as exc:
+              print(exc)
+          else:
+              raise SystemExit("7B QLoRA config was allowed without a GPU")
+          PY
+      - name: Do not train
+        run: echo "This workflow validates configuration only. It does not start OLMo training or provision a GPU."

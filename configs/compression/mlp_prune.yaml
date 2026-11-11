@@ -1,0 +1,11 @@
+architecture: olmo3
+strategy: uniform_structured_mlp
+percentages: [0.05, 0.10, 0.15]
+alignment: 1
+modify_original_checkpoint: false
+promote_by_default: false
+notes:
+  - 11008 intermediate units are not divisible by 64.
+  - Pruning attention heads is unsupported.
+  - A smaller parameter count is not a latency or memory claim.
+  - GGUF export of a pruned intermediate size is unsupported until a conversion test passes.

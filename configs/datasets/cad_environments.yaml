@@ -1,0 +1,39 @@
+adapter: cad_environments
+dataset_id: markov-ai/cad-environments
+revision_verified: 78aea4f2cdde9d1ef2fc1780c12689e6ec06b1e9
+licence: cc-by-nc-4.0
+commercial_use_default: false
+download_media_default: false
+software_slugs:
+  - autocad
+  - sketchup
+  - revit-architecture
+  - revit-structure
+  - revit-mep
+  - staad-pro
+index_columns:
+  - workflow_id
+  - software
+  - software_slug
+  - domain
+  - task
+  - description
+  - deliverables
+  - duration_hours
+  - platform
+  - event_count
+  - fps
+  - total_frames
+  - clip_url
+  - events_url
+  - frame_events_url
+  - narration_url
+  - task_description_url
+  - task_overview_url
+  - rubric_url
+  - input_files_url
+  - output_files_url
+notes:
+  - Interaction events are desktop UI traces.
+  - Do not map them to MynaCAD commands.
+  - The Hub card reports about 152 GB. The workflow index parquet is about 40 KB.

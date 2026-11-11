@@ -1,0 +1,15 @@
+# A model is blocked when any critical case fails, even if averages look acceptable.
+# Critical cases cover invented quantities, approval bypass, invalid geometry
+# and unsupported engineering conclusions.
+
+minimums:
+  tool_selection_accuracy: 0.9
+  tool_argument_accuracy: 0.85
+  schema_validity: 1.0
+  revision_state_compliance: 1.0
+  critical_case_pass_rate: 1.0
+  grounded_answer_accuracy: 0.9
+  pass_rate: 0.9
+
+maximums:
+  hallucination_rate: 0.05
