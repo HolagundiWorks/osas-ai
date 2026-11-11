@@ -1,0 +1,125 @@
+# Model registry. Application code selects entries by key.
+# Facts marked verified were read from the Hugging Face model card, config.json,
+# tokenizer_config.json and chat_template.jinja for allenai/Olmo-3-7B-Instruct.
+# The Qwen entry is a replacement slot. Its licence flag stays unverified until
+# that card is checked again at download time.
+
+default_model: olmo3-7b-instruct
+
+models:
+  olmo3-7b-instruct:
+    hf_id: allenai/Olmo-3-7B-Instruct
+    architecture: olmo3
+    hf_model_type: olmo3
+    transformers_class: Olmo3ForCausalLM
+    licence: apache-2.0
+    licence_verified: true
+    licence_notes: >
+      Apache 2.0. The model card also points at Ai2 Responsible Use Guidelines.
+      Redistribution of the weights must keep that licence. This repository
+      does not vendor the weights.
+    chat_template: olmo3_chatml_function_calls
+    eos_token: "<|endoftext|>"
+    pad_token: "<|pad|>"
+    lora_target_modules:
+      - q_proj
+      - k_proj
+      - v_proj
+      - o_proj
+      - gate_proj
+      - up_proj
+      - down_proj
+    fan_in_fan_out: false
+    qlora_supported: true
+    gguf_status: llama_cpp_olmo2_arch_since_b7120_conversion_not_run_here
+    min_transformers_version: "4.57.1"
+    context_length: 65536
+    default_training_seq_length: 2048
+    min_vram_gb_qlora: 16
+    min_vram_gb_lora: 28
+    requires_gpu_for_training: true
+    allow_cpu_smoke: false
+    purpose: production_candidate
+    parameter_note: >
+      32 layers, hidden 4096, intermediate 11008, 32 query heads, 32 KV heads,
+      sliding window 4096 on three of every four layers, YaRN rope factor 8
+      from an 8192 base, vocab 100278, bf16 checkpoint. use_cache is false in
+      the published config and must be enabled for generation.
+    verified_fields:
+      - hf_id
+      - architecture
+      - transformers_class
+      - licence
+      - eos_token
+      - pad_token
+      - context_length
+      - lora_target_modules
+    notes: >
+      QLoRA target modules match the published Linear names and public OLMo 3
+      QLoRA recipes. bitsandbytes 4-bit loading still requires an NVIDIA GPU
+      and a successful load test, which this environment did not run.
+      Training-time NF4 is not a GGUF deployment artifact.
+
+  qwen2.5-7b-instruct:
+    hf_id: Qwen/Qwen2.5-7B-Instruct
+    architecture: qwen2
+    hf_model_type: qwen2
+    transformers_class: Qwen2ForCausalLM
+    licence: apache-2.0
+    licence_verified: false
+    licence_notes: >
+      Commonly published as Apache 2.0. Re-check the model card before download
+      or redistribution. This entry is not the default and was not loaded here.
+    chat_template: chatml
+    eos_token: "<|im_end|>"
+    pad_token: "<|endoftext|>"
+    lora_target_modules:
+      - q_proj
+      - k_proj
+      - v_proj
+      - o_proj
+      - gate_proj
+      - up_proj
+      - down_proj
+    fan_in_fan_out: false
+    qlora_supported: true
+    gguf_status: llama_cpp_qwen2_widely_supported_not_tested_here
+    min_transformers_version: "4.46.0"
+    context_length: 32768
+    default_training_seq_length: 2048
+    min_vram_gb_qlora: 16
+    min_vram_gb_lora: 28
+    requires_gpu_for_training: true
+    allow_cpu_smoke: false
+    purpose: alternative
+    notes: >
+      Registered so a later experiment can switch models without editing code.
+      Do not assume OLMo 3 chat or GGUF settings apply to this checkpoint.
+
+  smoke-tiny:
+    hf_id: null
+    architecture: gpt2
+    hf_model_type: gpt2
+    transformers_class: GPT2LMHeadModel
+    licence: apache-2.0
+    licence_verified: true
+    licence_notes: >
+      Randomly initialised GPT-2 shaped model. No pretrained weights are downloaded.
+    chat_template: olmo3_chatml_function_calls
+    eos_token: "<|endoftext|>"
+    lora_target_modules:
+      - c_attn
+      - c_proj
+    fan_in_fan_out: true
+    qlora_supported: false
+    gguf_status: not_applicable
+    min_transformers_version: "4.46.0"
+    context_length: 256
+    default_training_seq_length: 256
+    requires_gpu_for_training: false
+    allow_cpu_smoke: true
+    local_constructor: gpt2-random
+    purpose: smoke_test_only
+    notes: >
+      Pipeline smoke test only. A passing run does not validate OLMo 3 7B
+      training, quantisation or GGUF export.

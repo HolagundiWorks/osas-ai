@@ -13,11 +13,11 @@ htmlcov/
 dist/
 build/
 *.egg-info/
-outputs/
-checkpoints/
-models/
-data/raw/
-data/processed/
+/outputs/
+/checkpoints/
+/models/
+/data/raw/
+/data/processed/
 *.safetensors
 *.bin
 *.gguf
