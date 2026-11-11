@@ -94,8 +94,6 @@ class LocalTransformersRuntime:
         }
 
     def _load_merged_directory(self, metadata: dict[str, Any]) -> None:
-        import torch
-
         config_file = self.checkpoint / "config.json"
         weights = self.checkpoint / "model.safetensors"
         if not config_file.is_file() or not weights.is_file():
@@ -103,6 +101,8 @@ class LocalTransformersRuntime:
                 f"Merged export {self.checkpoint} is missing config.json or model.safetensors. "
                 "Weights are not downloaded."
             )
+        import torch
+
         tokenizer = self._load_offline_tokenizer()
         with _hub_offline():
             try:
