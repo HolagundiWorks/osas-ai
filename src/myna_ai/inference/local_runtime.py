@@ -7,7 +7,10 @@ missing download fails instead of fetching weights.
 
 from __future__ import annotations
 
+import os
 import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +33,15 @@ class LocalTransformersRuntime:
         }
 
     def load(self) -> None:
+        metadata_path = self.checkpoint / "export_metadata.json"
+        if metadata_path.is_file():
+            metadata = read_json(metadata_path)
+            if metadata.get("artifact_type") == "merged_full_precision":
+                self._load_merged_directory(metadata)
+                return
+        self._load_training_checkpoint()
+
+    def _load_training_checkpoint(self) -> None:
         import torch
 
         from myna_ai.training.config import TrainingConfig
@@ -38,7 +50,11 @@ class LocalTransformersRuntime:
 
         state_path = self.checkpoint / "trainer_state.json"
         if not state_path.is_file():
-            raise InferenceError(f"No trainer_state.json in {self.checkpoint}")
+            raise InferenceError(
+                f"No trainer_state.json in {self.checkpoint}. "
+                "A merged export needs export_metadata.json with artifact_type merged_full_precision. "
+                "Weights are not downloaded."
+            )
         state = read_json(state_path)
         config_payload = read_json(self.checkpoint / "training_config.json")
         config = TrainingConfig.model_validate(config_payload)
@@ -76,6 +92,74 @@ class LocalTransformersRuntime:
             "olmo_7b_trained": False,
             "myna_ai_version": __version__,
         }
+
+    def _load_merged_directory(self, metadata: dict[str, Any]) -> None:
+        config_file = self.checkpoint / "config.json"
+        weights = self.checkpoint / "model.safetensors"
+        if not config_file.is_file() or not weights.is_file():
+            raise InferenceError(
+                f"Merged export {self.checkpoint} is missing config.json or model.safetensors. "
+                "Weights are not downloaded."
+            )
+        import torch
+
+        tokenizer = self._load_offline_tokenizer()
+        with _hub_offline():
+            try:
+                from transformers import AutoModelForCausalLM
+
+                model = AutoModelForCausalLM.from_pretrained(
+                    self.checkpoint,
+                    local_files_only=True,
+                    trust_remote_code=False,
+                )
+            except Exception as exc:
+                raise InferenceError(
+                    f"Could not load {self.checkpoint} from local files. No weights were downloaded."
+                ) from exc
+        if getattr(model.config, "use_cache", None) is False:
+            model.config.use_cache = True
+        model.eval()
+        self._model = model
+        self._tokenizer = tokenizer
+        self._device = torch.device("cpu")
+        model.to(self._device)
+        positions = getattr(model.config, "n_positions", None) or getattr(model.config, "max_position_embeddings", 2048)
+        self._max_positions = int(positions)
+        self._version = {
+            "model_key": metadata.get("model_key", "unknown"),
+            "base_model_id": metadata.get("base_model"),
+            "artifact_type": "merged_full_precision",
+            "checkpoint": str(self.checkpoint),
+            "offline": True,
+            "smoke_test": bool(metadata.get("smoke_test")),
+            "olmo_7b_trained": False,
+            "myna_ai_version": __version__,
+        }
+
+    def _load_offline_tokenizer(self) -> Any:
+        from myna_ai.training.tokenizer import CharTokenizer
+
+        char_path = self.checkpoint / "char_tokenizer.json"
+        if char_path.is_file():
+            return CharTokenizer.load(char_path)
+        if (self.checkpoint / "tokenizer_config.json").is_file():
+            with _hub_offline():
+                try:
+                    from transformers import AutoTokenizer
+
+                    tokenizer = AutoTokenizer.from_pretrained(self.checkpoint, local_files_only=True)
+                except Exception as exc:
+                    raise InferenceError(
+                        f"Could not load the tokenizer in {self.checkpoint}. No tokenizer was downloaded."
+                    ) from exc
+            if tokenizer.pad_token is None:
+                tokenizer.pad_token = tokenizer.eos_token
+            return tokenizer
+        raise InferenceError(
+            f"No char_tokenizer.json or tokenizer_config.json in {self.checkpoint}. "
+            "Refusing to download a tokenizer."
+        )
 
     def generate(
         self,
@@ -129,3 +213,17 @@ class LocalTransformersRuntime:
         if self._model is None:
             self.load()
         return dict(self._version)
+
+
+@contextmanager
+def _hub_offline() -> Iterator[None]:
+    """Keep a load from fetching missing files."""
+    previous = os.environ.get("HF_HUB_OFFLINE")
+    os.environ["HF_HUB_OFFLINE"] = "1"
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("HF_HUB_OFFLINE", None)
+        else:
+            os.environ["HF_HUB_OFFLINE"] = previous

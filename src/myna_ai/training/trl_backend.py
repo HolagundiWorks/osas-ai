@@ -1,9 +1,12 @@
 """Optional TRL SFT backend.
 
-The native loop remains the tested loss-masking path. This module constructs a
-TRL ``SFTTrainer`` from the same training config when a cloud job asks for
-``backend: trl``. Field names differ across TRL releases, so only parameters
-that exist on the installed ``SFTConfig`` are forwarded.
+The native loop remains the path that masks every assistant span. This module
+constructs a TRL ``SFTTrainer`` from the same training config. The smoke model
+uses a local character tokenizer, so the run does not download a checkpoint.
+TRL masks tokens before the first assistant span via ``completion_only_loss``.
+Later user turns that sit inside that completion are not masked. Field names
+differ across TRL releases, so only parameters that exist on the installed
+``SFTConfig`` are forwarded.
 """
 
 from __future__ import annotations
@@ -51,6 +54,7 @@ def build_sft_config(config: TrainingConfig) -> Any:
         "packing": False,
         "report_to": "none",
         "dataset_text_field": "text",
+        "completion_only_loss": True,
     }
     signature = inspect.signature(SFTConfig)
     accepted = {key: value for key, value in candidates.items() if key in signature.parameters}
@@ -60,26 +64,22 @@ def build_sft_config(config: TrainingConfig) -> Any:
 def run_trl_training(config: TrainingConfig, spec: ModelSpec) -> dict[str, Any]:
     """Run TRL SFT. Refuses CPU for any model that is not an explicit smoke run."""
     assert_training_device(spec, config)
-    if spec.local_constructor == "gpt2-random":
-        raise MynaAIError(
-            "The TRL backend loads a Hugging Face model id. "
-            "Use backend=native for the randomly initialised smoke model."
-        )
     try:
         from datasets import Dataset
         from trl import SFTTrainer
     except ImportError as exc:
         raise MynaAIError("TRL training needs the train extra (trl, datasets, transformers, peft).") from exc
-    from myna_ai.common.io import read_jsonl
+    from myna_ai.common.io import read_jsonl, write_json
     from myna_ai.models.chat import render_olmo3_chat
     from myna_ai.training.loop import _load_model, _load_tokenizer
+    from myna_ai.training.tokenizer import CharTokenizer
 
-    rows = []
-    for record in read_jsonl(config.train_path):
-        rendered = render_olmo3_chat(record["messages"], record.get("tools") or None, add_generation_prompt=False)
-        rows.append({"text": rendered.text})
+    rows = _prompt_completion_rows(config.train_path, read_jsonl, render_olmo3_chat)
+    if not rows:
+        raise MynaAIError(f"No assistant spans to train in {config.train_path}.")
     dataset = Dataset.from_list(rows)
     tokenizer = _load_tokenizer(config, spec)
+    processing = tokenizer.to_hf_tokenizer() if isinstance(tokenizer, CharTokenizer) else tokenizer
     model = _load_model(config, spec, tokenizer)
     trainer_kwargs: dict[str, Any] = {
         "model": model,
@@ -88,16 +88,41 @@ def run_trl_training(config: TrainingConfig, spec: ModelSpec) -> dict[str, Any]:
     }
     signature = inspect.signature(SFTTrainer.__init__)
     if "processing_class" in signature.parameters:
-        trainer_kwargs["processing_class"] = tokenizer
+        trainer_kwargs["processing_class"] = processing
     elif "tokenizer" in signature.parameters:
-        trainer_kwargs["tokenizer"] = tokenizer
+        trainer_kwargs["tokenizer"] = processing
+    else:
+        raise MynaAIError("This TRL release has no tokenizer argument on SFTTrainer.")
     trainer = SFTTrainer(**trainer_kwargs)
-    train_output = trainer.train(resume_from_checkpoint=str(config.resume_from_checkpoint) if config.resume_from_checkpoint else None)
-    trainer.save_model(str(config.output_dir / "trl_adapter"))
-    return {
+    resume = str(config.resume_from_checkpoint) if config.resume_from_checkpoint else None
+    train_output = trainer.train(resume_from_checkpoint=resume)
+    adapter_dir = config.output_dir / "trl_adapter"
+    trainer.save_model(str(adapter_dir))
+    metrics = getattr(train_output, "metrics", {}) or {}
+    result = {
         "backend": "trl",
         "model_key": spec.key,
-        "metrics": getattr(train_output, "metrics", {}),
-        "olmo_7b_trained": spec.key == "olmo3-7b-instruct",
-        "smoke_test": False,
+        "base_model": spec.hf_id,
+        "metrics": metrics,
+        "checkpoint": str(adapter_dir),
+        "examples": len(rows),
+        "loss_mask": "completion_only_from_first_assistant_span",
+        "olmo_7b_trained": False,
+        "smoke_test": spec.purpose == "smoke_test_only",
     }
+    write_json(config.output_dir / "train_result.json", result)
+    return result
+
+
+def _prompt_completion_rows(path: Any, read_jsonl: Any, render_olmo3_chat: Any) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for record in read_jsonl(path):
+        rendered = render_olmo3_chat(record["messages"], record.get("tools") or None, add_generation_prompt=False)
+        if not rendered.assistant_spans:
+            continue
+        start = rendered.assistant_spans[0][0]
+        prompt = rendered.text[:start]
+        completion = rendered.text[start:]
+        if prompt and completion:
+            rows.append({"prompt": prompt, "completion": completion})
+    return rows
