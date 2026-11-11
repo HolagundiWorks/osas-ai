@@ -4,7 +4,11 @@ This repository does not create RunPod or Lambda instances. The commands below a
 
 ## What was actually run
 
-The development environment had no CUDA device. Pytest passed 24 tests. The CPU smoke model trained for 6 steps (loss 4.856 to 4.645), resumed through step 8, and reloaded for generation. Gradient checkpointing was enabled for a separate 1-step run on the same tiny model. QLoRA, the 7B download, GGUF conversion and any cloud instance were not run. `assert_training_device` rejects the 7B QLoRA config when CUDA is absent.
+The development environment had no CUDA device. Pytest passed on CPU. The smoke model trained, resumed, and reloaded for generation. QLoRA training, GGUF conversion, and any cloud instance were not run. `assert_training_device` rejects the 7B QLoRA config when CUDA is absent.
+
+`allenai/Olmo-3-7B-Instruct` was downloaded to `models/olmo3-7b-instruct`, which git ignores. The snapshot is three safetensors shards, about 14.6 GB of bf16 weights, 7,298,011,136 parameters. `config.json` matches the registry: `Olmo3ForCausalLM`, 32 layers, hidden 4096, intermediate 11008, 32/32 heads, vocab 100278, context 65536, YaRN factor 8 from 8192, sliding window 4096, `use_cache` false. The weights were not loaded for training.
+
+`docker build -t myna-ai:local -f docker/Dockerfile .` completed. The image is about 10 GB and does not contain the checkpoint. It upgrades the base torch 2.5.1 to `2.6.0+cu124` so transformers 5 can import `Olmo3Config`. Running the image command on this CPU host raises `GpuRequiredError` and does not download or train.
 
 ## Hardware
 

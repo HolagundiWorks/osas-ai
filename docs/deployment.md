@@ -6,6 +6,8 @@
 - A local base-model directory produced by `scripts/download_model.py --execute`.
 - The Python client in `myna_ai.inference`, which loads local files and does not need the training machine.
 
+The CUDA training image can be built with `docker build -t myna-ai:local -f docker/Dockerfile .`. `.dockerignore` keeps `models/` out of that image. The image tag built here is `myna-ai:local`. It is not a GGUF runtime.
+
 GGUF is a documented target, not an artifact this repository has produced. llama.cpp has registered `Olmo3ForCausalLM` since build b7120 and stores it under the `olmo2` architecture label, including the sliding-window pattern. Public quantisations of `allenai/Olmo-3-7B-Instruct` exist. `assess_gguf` reports `conversion_executed: false` until `convert_hf_to_gguf.py` is actually run. Training-time NF4 QLoRA is not that file.
 
 Until a GGUF conversion is tested on the exact checkpoint you trained, the offline runtime is Hugging Face Transformers from a local directory:
