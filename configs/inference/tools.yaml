@@ -1,0 +1,176 @@
+# Proposed tool contracts for training, evaluation and the mock executor.
+# verified_against_myna_application must stay false until MynaCAD or CoreOps
+# publishes a checked API. Do not point these names at live project files.
+
+namespace_status: proposed_example
+verified_against_myna_application: false
+tools:
+  - name: cad.select_entities
+    namespace: cad
+    description: Select drawing entities that already exist in application state.
+    state_changing: false
+    requires_authorisation: false
+    verified: false
+    parameters:
+      type: object
+      additionalProperties: false
+      required: [project_id, criteria]
+      properties:
+        project_id: {type: string, minLength: 1}
+        criteria:
+          type: object
+          additionalProperties: false
+          properties:
+            layer: {type: string}
+            floor: {type: string}
+            entity_type: {type: string}
+    notes: Example schema. Selection is executed by the application, not by raw model text.
+
+  - name: cad.create_geometry
+    namespace: cad
+    description: Request creation of one geometric entity from values supplied by the user or by a tool result.
+    state_changing: true
+    requires_authorisation: true
+    verified: false
+    parameters:
+      type: object
+      additionalProperties: false
+      required: [project_id, kind, layer, units, geometry]
+      properties:
+        project_id: {type: string, minLength: 1}
+        kind: {type: string, enum: [line, polyline, arc, circle]}
+        layer: {type: string, minLength: 1}
+        units: {type: string, enum: [mm, m]}
+        geometry:
+          type: object
+          additionalProperties: false
+          required: [start, end]
+          properties:
+            start: {type: array, items: {type: number}, minItems: 2, maxItems: 3}
+            end: {type: array, items: {type: number}, minItems: 2, maxItems: 3}
+    notes: Example schema. The application must validate geometry before writing a drawing.
+
+  - name: cad.modify_geometry
+    namespace: cad
+    description: Request an edit to an entity id that already exists.
+    state_changing: true
+    requires_authorisation: true
+    verified: false
+    parameters:
+      type: object
+      additionalProperties: false
+      required: [project_id, entity_id, geometry]
+      properties:
+        project_id: {type: string, minLength: 1}
+        entity_id: {type: string, minLength: 1}
+        geometry: {type: object}
+    notes: Example schema.
+
+  - name: cad.filter_view
+    namespace: cad
+    description: Request a layer or floor filter. Does not delete entities.
+    state_changing: false
+    requires_authorisation: false
+    verified: false
+    parameters:
+      type: object
+      additionalProperties: false
+      required: [project_id]
+      properties:
+        project_id: {type: string, minLength: 1}
+        layers: {type: array, items: {type: string}}
+        floors: {type: array, items: {type: string}}
+    notes: Example schema.
+
+  - name: structural.describe_element
+    namespace: structural
+    description: Record structural properties that were supplied by the user or by project data. Does not design the element.
+    state_changing: false
+    requires_authorisation: false
+    verified: false
+    parameters:
+      type: object
+      additionalProperties: false
+      required: [project_id, element_id, element_type]
+      properties:
+        project_id: {type: string, minLength: 1}
+        element_id: {type: string, minLength: 1}
+        element_type: {type: string, enum: [beam, column, slab, wall, footing]}
+        properties: {type: object}
+    notes: Example schema. Design checks stay in a deterministic structural service.
+
+  - name: coreops.extract_quantities
+    namespace: coreops
+    description: Read quantities from the application quantity service.
+    state_changing: false
+    requires_authorisation: false
+    verified: false
+    parameters:
+      type: object
+      additionalProperties: false
+      required: [project_id]
+      properties:
+        project_id: {type: string, minLength: 1}
+        element_ids: {type: array, items: {type: string}}
+    notes: The model must not supply the numeric result. The service returns stored quantities.
+
+  - name: coreops.update_draft_estimate
+    namespace: coreops
+    description: Ask the application to refresh a draft estimate from current quantities.
+    state_changing: true
+    requires_authorisation: true
+    verified: false
+    parameters:
+      type: object
+      additionalProperties: false
+      required: [project_id, reason]
+      properties:
+        project_id: {type: string, minLength: 1}
+        reason: {type: string, minLength: 1}
+    notes: Rejected by the mock when the estimate is approved.
+
+  - name: coreops.revise_approved_estimate
+    namespace: coreops
+    description: Ask the application to open a revision of an approved estimate.
+    state_changing: true
+    requires_authorisation: true
+    verified: false
+    parameters:
+      type: object
+      additionalProperties: false
+      required: [project_id, reason]
+      properties:
+        project_id: {type: string, minLength: 1}
+        reason: {type: string, minLength: 1}
+    notes: The application owns the revision counter. Model text cannot mark an estimate approved.
+
+  - name: bim.identify_elements
+    namespace: bim
+    description: Propose BIM concepts for structured 2D entities and list missing information.
+    state_changing: false
+    requires_authorisation: false
+    verified: false
+    parameters:
+      type: object
+      additionalProperties: false
+      required: [project_id]
+      properties:
+        project_id: {type: string, minLength: 1}
+        entity_ids: {type: array, items: {type: string}}
+    notes: Example schema for a future 2D-to-BIM assistant. It does not generate a model.
+
+  - name: bim.propose_model_generation
+    namespace: bim
+    description: Propose a model-generation task. The proposal itself creates nothing.
+    state_changing: false
+    requires_authorisation: false
+    verified: false
+    parameters:
+      type: object
+      additionalProperties: false
+      required: [project_id, reason]
+      properties:
+        project_id: {type: string, minLength: 1}
+        reason: {type: string, minLength: 1}
+        missing_information: {type: array, items: {type: string}}
+    notes: Example schema. Generation remains an authorised application operation.

@@ -1,0 +1,7 @@
+adapter: synthetic
+dataset_id: myna-ai-synthetic
+licence: apache-2.0
+commercial_use_default: true
+notes:
+  - Original examples for tests and for the CPU smoke run.
+  - Held-out evaluation prompts live in the evaluation package and are not in this corpus.

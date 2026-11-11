@@ -1,0 +1,32 @@
+# QLoRA configuration for allenai/Olmo-3-7B-Instruct.
+# Do not launch this on CPU. The trainer refuses to start without a CUDA GPU
+# that has at least 16 GB free. A 24 GB NVIDIA GPU is the practical default
+# at sequence length 2048 with batch size 1.
+model_key: olmo3-7b-instruct
+train_path: ${MYNA_TRAIN_PATH}
+validation_path: ${MYNA_VALIDATION_PATH}
+output_dir: ${MYNA_OUTPUT_DIR}
+method: qlora
+max_seq_length: 2048
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+learning_rate: 0.0001
+weight_decay: 0.0
+per_device_batch_size: 1
+gradient_accumulation_steps: 16
+epochs: 1
+precision: bf16
+gradient_checkpointing: true
+seed: 42
+logging_steps: 5
+eval_steps: 50
+save_steps: 50
+early_stopping_patience: 3
+early_stopping_min_delta: 0.01
+warmup_steps: 20
+allow_cpu_smoke: false
+backend: native
+local_files_only: true
+# Set model_path to the local snapshot created by scripts/download_model.py
+# before starting a run that must stay offline.

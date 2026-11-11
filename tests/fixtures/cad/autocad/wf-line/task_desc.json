@@ -1,0 +1,13 @@
+{
+  "schema_version": "fixture-1",
+  "domain": "Architectural drafting",
+  "application": "AutoCAD",
+  "task": "Draw a grid line that the brief already dimensions.",
+  "description": "The brief asks for one straight grid line.",
+  "dimensions": [
+    {"id": "D1", "element": "Grid line", "measurement": "6000 mm"}
+  ],
+  "deliverables": [
+    {"type": "drawing", "format": "DWG", "description": "Grid line"}
+  ]
+}

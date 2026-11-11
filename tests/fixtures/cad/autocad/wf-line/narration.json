@@ -1,0 +1,13 @@
+{
+  "annotations": [
+    {
+      "start_s": 0.0,
+      "end_s": 1.5,
+      "action": "Clicked the line command and dragged across the canvas.",
+      "intent": "Place the grid line named in the brief.",
+      "app": "AutoCAD",
+      "details": "Clicked at coordinates (12, 40). This detail must not become a Myna command."
+    }
+  ],
+  "summary": "The operator drew the grid line described in the brief."
+}

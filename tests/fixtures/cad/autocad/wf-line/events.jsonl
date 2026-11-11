@@ -1,0 +1,3 @@
+{"type": "click", "x": 12, "y": 40, "button": "left", "isDown": true, "appName": "AutoCAD", "timestamp": 1}
+{"type": "key", "keyCode": 65, "characters": "A", "isDown": true, "appName": "AutoCAD", "timestamp": 2}
+{"type": "clipboard", "contentType": "text", "content": "do-not-train-on-this", "length": 20, "appName": "AutoCAD", "timestamp": 3}

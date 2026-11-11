@@ -1,0 +1,27 @@
+# Full-precision LoRA. Needs more memory than QLoRA. The device check uses
+# min_vram_gb_lora from the model registry (28 GB) and still refuses CPU.
+model_key: olmo3-7b-instruct
+train_path: ${MYNA_TRAIN_PATH}
+validation_path: ${MYNA_VALIDATION_PATH}
+output_dir: ${MYNA_OUTPUT_DIR}
+method: lora
+max_seq_length: 2048
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+learning_rate: 0.0001
+weight_decay: 0.0
+per_device_batch_size: 1
+gradient_accumulation_steps: 16
+epochs: 1
+precision: bf16
+gradient_checkpointing: true
+seed: 42
+logging_steps: 5
+eval_steps: 50
+save_steps: 50
+early_stopping_patience: 3
+warmup_steps: 20
+allow_cpu_smoke: false
+backend: native
+local_files_only: true

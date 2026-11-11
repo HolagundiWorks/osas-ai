@@ -1,0 +1,12 @@
+offline: true
+local_files_only: true
+timeout_seconds: 30
+max_new_tokens: 256
+execute_tools_default: false
+require_authorisation_for_state_changes: true
+write_project_files: false
+model_key: olmo3-7b-instruct
+smoke_model_key: smoke-tiny
+notes:
+  - Load models from a local directory after an explicit download.
+  - Raw model text must not be applied to drawings or databases.
