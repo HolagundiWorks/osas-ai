@@ -92,6 +92,15 @@ Full instructions: `docs/cloud-training.md`.
 ```bash
 python scripts/evaluate.py --reference --label reference --output outputs/eval-reference
 python scripts/export.py --checkpoint outputs/smoke-tiny/checkpoint-12 --output outputs/export --model-key smoke-tiny --gguf-check
+python scripts/export.py --checkpoint outputs/smoke-tiny/checkpoint-12 --output outputs/merged --model-key smoke-tiny --merge
+```
+
+`--merge` writes a full-precision smoke model. It does not download OLMo, and it refuses a QLoRA checkpoint. `--full-precision` copies safetensors and skips `optimizer.pt`. A GGUF file is written only with `--gguf-convert`, and that file is not marked as loaded by llama.cpp.
+
+Recovery from a pruned checkpoint prints a plan unless `--execute-recovery` is set. The OLMo config still exits on CPU.
+
+```bash
+python scripts/train.py --config configs/training/smoke_tiny_lora.yaml --recovery --pruned-checkpoint outputs/smoke-tiny/checkpoint-12
 ```
 
 A model is not promoted when a critical quantity, revision, geometry or engineering-safety case fails. The reference command scores scripted gold answers. It does not load OLMo.

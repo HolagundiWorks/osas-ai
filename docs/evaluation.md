@@ -18,7 +18,13 @@ Thresholds are in `configs/evaluation/acceptance.yaml`.
 | GPU memory | Only when CUDA reports a peak |
 | Artifact size | Sum of files in an export directory |
 
-Compare labels by passing several reports to `compare_reports`. The intended labels are the original OLMo checkpoint, the fine-tuned adapter, a quantised artifact and a pruned artifact. Only the scripted reference and the faulty generator have been scored in this environment. The original 7B checkpoint has not been downloaded, so there is no measured baseline for it.
+Compare labels by passing several reports to `compare_reports`. The A/B/C/D matrix uses the same roles: A original, B fine-tuned, C quantised, D pruned. A slot with no report is stored as `measured: false` and has no metrics. `olmo_7b_baseline_measured` is true only when slot A was supplied and that report sets `olmo_7b_evaluated`. The scripted reference does not set that flag. The original 7B checkpoint has not been downloaded, so there is no measured baseline for it.
+
+```bash
+python scripts/evaluate.py \
+  --reference --label reference --output outputs/eval-reference --slot B \
+  --matrix-output outputs/matrix
+```
 
 ```bash
 python scripts/evaluate.py --reference --label reference --output outputs/eval-reference

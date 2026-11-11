@@ -28,7 +28,18 @@ python scripts/export.py \
   --gguf-check
 ```
 
-For a real run, point `--checkpoint` at the 7B adapter directory and `--model-key` at `olmo3-7b-instruct`. Merging the adapter into the base weights is left to PEFT's `merge_and_unload` on the GPU machine after you have decided the adapter is worth merging. This package does not merge inside the exporter, because a merge needs the base weights.
+For a real run, point `--checkpoint` at the 7B adapter directory and `--model-key` at `olmo3-7b-instruct`.
+
+`--full-precision` copies `model.safetensors` and tokenizer sidecars. It leaves `optimizer.pt` behind. A LoRA checkpoint still contains adapter tensors in that state dict.
+
+`--merge` runs PEFT `merge_and_unload` and writes a full-precision directory plus a checksum manifest. The smoke checkpoint can be merged on CPU because its base weights are already in `model.safetensors`. An OLMo merge requires `model_path` in `training_config.json` to be a local directory that already contains `config.json`. The exporter does not download weights. QLoRA checkpoints are refused. `promotion_allowed` stays false, and `olmo_7b_trained` stays false.
+
+```bash
+python scripts/export.py --checkpoint outputs/smoke-tiny/checkpoint-12 --output outputs/merged --model-key smoke-tiny --merge
+python scripts/export.py --checkpoint outputs/smoke-tiny/checkpoint-12 --output outputs/weights --model-key smoke-tiny --full-precision
+```
+
+`--gguf-convert` runs a supplied `convert_hf_to_gguf.py` and writes a sibling `.gguf` file. The report sets `llama_cpp_load_verified` to false. A converter that exits 0 is not a claim that llama.cpp loaded OLMo 3. Qwen conversion is refused while `licence_verified` is false. The smoke GPT-2 is not a GGUF target.
 
 ## Application integration
 
